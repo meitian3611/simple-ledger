@@ -1,0 +1,62 @@
+{
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue",
+			// 自定义匹配规则，当使用 <custom-layout> 标签时，会自动引入这个组件
+			"custom-layout": "@/components/Layout/Layout.vue"
+		}
+	},
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "",
+		"navigationBarBackgroundColor": "#3B82F6",
+		"backgroundColor": "#3B82F6"
+	},
+	"tabBar": {
+		"custom": true,
+		"list": [{
+				"text": "首页",
+				"pagePath": "pages/home/index",
+				"visible": false
+			},
+			{
+				"text": "记账",
+				"pagePath": "pages/record/index",
+				"visible": false
+			},
+			{
+				"text": "总览",
+				"pagePath": "pages/statistics/index",
+				"visible": false
+			},
+			{
+				"text": "我的",
+				"pagePath": "pages/mine/index",
+				"visible": false
+			}
+		]
+	},
+	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+		{
+			"path": "pages/home/index",
+			"style": {},
+			"needLogin": false
+		},
+		{
+			"path": "pages/record/index",
+			"style": {},
+			"needLogin": false
+		},
+		{
+			"path": "pages/statistics/index",
+			"style": {},
+			"needLogin": false
+		},
+		{
+			"path": "pages/mine/index",
+			"style": {},
+			"needLogin": false
+		}
+	]
+}
