@@ -1,5 +1,5 @@
+
 <template>
-	<style scoped lang="scss"></style>
 	<view class="layout-container">
 		<view class="page-content">
 			<slot />

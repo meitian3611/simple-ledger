@@ -21,3 +21,18 @@ export const getDomHeight = async (dom: string) => {
 	const height = await getContentHeight(dom);
 	return height;
 };
+
+const hm = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+export const formatRelativeTime = (ts: number) => {
+  const now = new Date();
+  const d = new Date(ts);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.floor((todayStart - dayStart) / 86400000);
+  if (diffDays === 0) return `今天 ${hm(d)}`;
+  if (diffDays === 1) return `昨天 ${hm(d)}`;
+  if (diffDays === 2) return `前天 ${hm(d)}`;
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  const dd = d.getDate().toString().padStart(2, '0');
+  return `${mm}-${dd} ${hm(d)}`;
+};
