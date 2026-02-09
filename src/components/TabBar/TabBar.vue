@@ -17,11 +17,6 @@
 					<icon class="iconfont" :class="tabbarValue == 'statistics' ? 'icon-tongji-ht' : 'icon-tongji'"></icon>
 				</template>
 			</wd-tabbar-item>
-			<wd-tabbar-item name="mine" title="我的">
-				<template #icon>
-					<icon class="iconfont" :class="tabbarValue == 'mine' ? 'icon-wode-ht' : 'icon-wode'"></icon>
-				</template>
-			</wd-tabbar-item>
 		</wd-tabbar>
 	</view>
 </template>

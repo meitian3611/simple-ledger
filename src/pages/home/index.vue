@@ -27,33 +27,6 @@
 					</view>
 				</view>
 			</view>
-			<!-- 收入支出按钮 -->
-			<view class="button-view">
-				<view class="btn">
-					<button class="mtbtn-class add" hover-class="mtbtn-hover-class">
-						<wd-icon name="add" size="28rpx"></wd-icon>
-					</button>
-					<text>收入</text>
-				</view>
-				<view class="btn">
-					<button class="mtbtn-class decrease" hover-class="mtbtn-hover-class">
-						<wd-icon name="decrease" size="28rpx"></wd-icon>
-					</button>
-					<text>支出</text>
-				</view>
-				<view class="btn">
-					<button class="mtbtn-class swap" hover-class="mtbtn-hover-class">
-						<wd-icon name="swap" size="28rpx"></wd-icon>
-					</button>
-					<text>转账</text>
-				</view>
-				<view class="btn">
-					<button class="mtbtn-class more" hover-class="mtbtn-hover-class">
-						<wd-icon name="more" size="28rpx"></wd-icon>
-					</button>
-					<text>更多</text>
-				</view>
-			</view>
 			<!-- 最近交易展示 -->
 			<view class="tran-view">
 				<view class="title-btn">
@@ -69,7 +42,7 @@
 								<text class="date">今天 12:30</text>
 							</view>
 						</view>
-						<view class="num" :class="'red'">-¥450.00</view>
+						<view class="num" :class="'expense'">-¥450.00</view>
 					</view>
 
 					<view class="tran-item">
@@ -80,7 +53,7 @@
 								<text class="date">昨天 19:55</text>
 							</view>
 						</view>
-						<view class="num" :class="'green'">+¥54,450.00</view>
+						<view class="num" :class="'income'">+¥54,450.00</view>
 					</view>
 
 					<view class="tran-item">
@@ -91,7 +64,7 @@
 								<text class="date">今天 07:13</text>
 							</view>
 						</view>
-						<view class="num" :class="'red'">-¥30.00</view>
+						<view class="num" :class="'expense'">-¥30.00</view>
 					</view>
 					<view class="tran-item">
 						<view class="info">
@@ -101,7 +74,7 @@
 								<text class="date">昨天 09:14</text>
 							</view>
 						</view>
-						<view class="num" :class="'red'">-¥2,450.00</view>
+						<view class="num" :class="'expense'">-¥2,450.00</view>
 					</view>
 					<view class="tran-item">
 						<view class="info">
@@ -111,7 +84,27 @@
 								<text class="date">今天 10:56</text>
 							</view>
 						</view>
-						<view class="num" :class="'red'">-¥5.00</view>
+						<view class="num" :class="'expense'">-¥5.00</view>
+					</view>
+					<view class="tran-item">
+						<view class="info">
+							<icon class="iconfont" :class="'icon-gongjiao'"></icon>
+							<view class="info-text">
+								<text class="label">地铁</text>
+								<text class="date">今天 10:56</text>
+							</view>
+						</view>
+						<view class="num" :class="'expense'">-¥5.00</view>
+					</view>
+					<view class="tran-item">
+						<view class="info">
+							<icon class="iconfont" :class="'icon-qita'"></icon>
+							<view class="info-text">
+								<text class="label">其它收支</text>
+								<text class="date">昨天 20:05</text>
+							</view>
+						</view>
+						<view class="num" :class="'expense'">-¥200.00</view>
 					</view>
 
 					<view class="tran-item">
@@ -122,18 +115,7 @@
 								<text class="date">昨天 20:05</text>
 							</view>
 						</view>
-						<view class="num" :class="'red'">-¥200.00</view>
-					</view>
-
-					<view class="tran-item">
-						<view class="info">
-							<icon class="iconfont" :class="'icon-qita'"></icon>
-							<view class="info-text">
-								<text class="label">其它收支</text>
-								<text class="date">昨天 20:05</text>
-							</view>
-						</view>
-						<view class="num" :class="'red'">-¥200.00</view>
+						<view class="num" :class="'expense'">-¥200.00</view>
 					</view>
 				</view>
 			</view>
@@ -156,12 +138,11 @@ onMounted(async () => {
 // 动态设置列表最大高度，自适应滚动条
 const setListHeight = async () => {
 	const cardHeight = await getDomHeight('.card-view');
-	const btnHeight = await getDomHeight('.button-view');
 	const systemInfo = uni.getSystemInfoSync(); // 获取设备信息
 	const windowHeight = systemInfo.windowHeight; // 可视区域总高度 - 不包括顶部状态栏
 	const tabbarHeight = 50 + (systemInfo.safeAreaInsets?.bottom || 0); // 默认50，兼容部分机型底部小黑条导航 +34
 	// 设置容器高度, 10为误差
-	scrollHeight.value = windowHeight - cardHeight - btnHeight - 36 - tabbarHeight - 10;
+	scrollHeight.value = windowHeight - cardHeight  - 36 - tabbarHeight - 10;
 };
 </script>
 
@@ -332,13 +313,13 @@ const setListHeight = async () => {
 				.num {
 					font-weight: 600;
 					font-size: 32rpx;
-					color: #666;
+					color: #333;
 				}
-				.num.red {
+				.num.expense {
+					color: #333;
+				}
+				.num.income {
 					color: #ef4444;
-				}
-				.num.green {
-					color: #10b981;
 				}
 			}
 			.tran-item:nth-child(1) {

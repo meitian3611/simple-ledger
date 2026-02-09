@@ -24,9 +24,20 @@ const props = withDefaults(defineProps<Props>(), {
 	/* 确保布局容器占满整个屏幕 */
 	background-color: #fff;
 	width: 100%;
-	max-height: calc(100vh - 100rpx);
+	height: calc(100vh - 100rpx);
 	overflow-y: auto;
+	overflow-x: hidden;
 	position: relative;
+	box-sizing: border-box;
+	
+	/* 隐藏滚动条但保持滚动功能 */
+	&::-webkit-scrollbar {
+		display: none;
+		width: 0;
+		height: 0;
+	}
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE/Edge */
 }
 
 .page-content {

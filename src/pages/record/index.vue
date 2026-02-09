@@ -1,256 +1,487 @@
 <template>
 	<custom-layout>
-    <view class="content-record">
-            <view class="chat-list" :style="{ height: chatListHeight + 'px' }">
-                <view
-                    v-for="(msg, idx) in messages"
-                    :key="idx"
-                    class="chat-item"
-                    :class="msg.side"
-                >
-                    <view v-if="msg.side === 'left'" class="avatar"></view>
-                    <view class="msg-wrap" :class="msg.side">
-                        <view class="bubble" :class="msg.type === 'user' ? 'user' : ''">
-                            <text v-if="msg.type === 'user'">{{ msg.text }}</text>
-                            <view v-else class="record-card">
-                                <text class="card-title">已为你记录：</text>
-                                <view class="card-row"><text>类型：{{ msg.record?.kind }}</text></view>
-                                <view class="card-row"><text>金额：¥{{ formatAmount(msg.record?.amount) }}</text></view>
-                                <view class="card-row"><text>分类：{{ msg.record?.category }}</text></view>
-                                <view class="card-row"><text>时间：{{ msg.record?.time }}</text></view>
-                            </view>
-                        </view>
-                </view>
-                </view>
-            </view>
+		<view class="content-record">
+			<!-- 金额输入区域 -->
+			<view class="amount-section">
+				<view class="type-tabs">
+					<view 
+						class="type-tab" 
+						:class="{ active: recordType === 'expense' }" 
+						@click="recordType = 'expense'"
+					>
+						<text>支出</text>
+					</view>
+					<view 
+						class="type-tab" 
+						:class="{ active: recordType === 'income' }" 
+						@click="recordType = 'income'"
+					>
+						<text>收入</text>
+					</view>
+				</view>
+				<view class="amount-display">
+					<text class="currency">¥</text>
+					<input 
+						class="amount-input" 
+						type="digit" 
+						v-model="amount" 
+						placeholder="0.00"
+						placeholder-class="amount-placeholder"
+					/>
+				</view>
+			</view>
 
-            <view class="chat-input">
-                <input class="input" v-model="inputText" placeholder="请输入收支情况..." @confirm="send" />
-                <button class="send-btn" @click="send"><text class="send-icon">✈</text></button>
-            </view>
-        </view>
+			<!-- 分类选择 -->
+			<view class="form-section">
+				<view class="section-title">选择分类</view>
+				<view class="category-grid">
+					<view 
+						v-for="item in currentCategories" 
+						:key="item.value"
+						class="category-item"
+						:class="{ active: category === item.value }"
+						@click="category = item.value"
+					>
+						<view class="category-icon">
+							<icon class="iconfont" :class="item.icon"></icon>
+						</view>
+						<text class="category-name">{{ item.label }}</text>
+					</view>
+				</view>
+			</view>
+
+			<!-- 日期选择 -->
+			<view class="form-section">
+				<view class="section-title">选择日期</view>
+				<wd-cell 
+					title="" 
+					:value="formatDisplayDate(selectedDate)" 
+					is-link 
+					@click="openDatePicker"
+					custom-class="date-cell"
+				>
+					<template #icon>
+						<icon class="iconfont icon-rili date-icon"></icon>
+					</template>
+				</wd-cell>
+			</view>
+
+			<!-- 备注输入 -->
+			<view class="form-section">
+				<view class="section-title">备注</view>
+				<view class="remark-input-wrap">
+					<textarea 
+						class="remark-input" 
+						v-model="remark" 
+						placeholder="添加备注信息（可选）"
+						placeholder-class="remark-placeholder"
+						:maxlength="100"
+						auto-height
+					/>
+				</view>
+			</view>
+
+			<!-- 底部占位，防止内容被固定按钮遮挡 -->
+			<view class="bottom-placeholder"></view>
+
+			<!-- 日期选择器 -->
+			<wd-datetime-picker-view
+				v-if="datePickerVisible"
+				v-model="tempDate"
+				type="date"
+			/>
+			<wd-popup v-model="datePickerVisible" position="bottom" custom-style="padding: 20rpx;">
+				<view class="picker-header">
+					<text class="picker-cancel" @click="datePickerVisible = false">取消</text>
+					<text class="picker-title">选择日期</text>
+					<text class="picker-confirm" @click="confirmDate">确定</text>
+				</view>
+				<wd-datetime-picker-view v-model="tempDate" type="date" />
+			</wd-popup>
+
+			<!-- 提交成功提示 -->
+			<wd-toast />
+
+			<!-- 提交按钮 - 固定底部 -->
+			<view class="submit-section" v-show="!datePickerVisible">
+				<button class="submit-btn" :class="recordType" @click="handleSubmit">
+					<text>{{ recordType === 'expense' ? '记一笔支出' : '记一笔收入' }}</text>
+				</button>
+			</view>
+		</view>
 	</custom-layout>
 </template>
 
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
-import { ref, onMounted } from 'vue';
-import { getDomHeight, formatRelativeTime } from '@/utils/common';
+import { useToast } from 'wot-design-uni';
 
-type Side = 'left' | 'right';
-type MsgType = 'robot' | 'user';
-interface RecordItem {
-    kind: string;
-    amount: number;
-    category: string;
-    time: string;
-}
-interface Message {
-    side: Side;
-    type: MsgType;
-    text?: string;
-    record?: RecordItem;
-    time?: string;
-}
+const toast = useToast();
 
-const chatListHeight = ref(300);
+// 记账类型: expense-支出, income-收入
+const recordType = ref<'expense' | 'income'>('expense');
+const amount = ref('');
+const category = ref('');
+const remark = ref('');
+const selectedDate = ref(Date.now());
+const datePickerVisible = ref(false);
+const tempDate = ref(Date.now());
 
-const messages = ref<Message[]>([
-    {
-        side: 'right',
-        type: 'user',
-        text: '下午坐地铁花了10元',
-    },
-    {
-        side: 'left',
-        type: 'robot',
-        record: {
-            kind: '支出',
-            amount: 10,
-            category: '交通',
-            time: (() => {
-                const y = new Date(Date.now() - 86400000);
-                y.setHours(18, 15, 0, 0);
-                return formatRelativeTime(y.getTime());
-            })()
-        }
-    },    {
-        side: 'right',
-        type: 'user',
-        text: '晚上吃饭50元',
-    },
-    {
-        side: 'left',
-        type: 'robot',
-        record: {
-            kind: '支出',
-            amount: 50,
-            category: '餐饮',
-            time: formatRelativeTime(Date.now())
-        }
-    }
-]);
+// 支出分类
+const expenseCategories = [
+	{ label: '餐饮', value: 'food', icon: 'icon-canting' },
+	{ label: '交通', value: 'transport', icon: 'icon-gongjiao' },
+	{ label: '购物', value: 'shopping', icon: 'icon-gouwu' },
+	{ label: '房租', value: 'rent', icon: 'icon-fangzu' },
+	{ label: '娱乐', value: 'entertainment', icon: 'icon-yule' },
+	{ label: '医疗', value: 'medical', icon: 'icon-yiliao' },
+	{ label: '教育', value: 'education', icon: 'icon-jiaoyu' },
+	{ label: '其它', value: 'other', icon: 'icon-qita' }
+];
 
-const inputText = ref('');
-const send = () => {
-    const text = inputText.value.trim();
-    if (!text) return;
-    const nowTs = Date.now();
-    messages.value.push({ side: 'right', type: 'user', text, time: formatRelativeTime(nowTs) });
-    inputText.value = '';
-    const lower = text.toLowerCase();
-    const amountMatch = text.match(/(\d+(?:\.\d+)?)/);
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
-    const category = /(打车|地铁|公交)/.test(text) ? '交通' : /(饭|餐|早餐|午餐|晚餐)/.test(text) ? '餐饮' : '其它收支';
-    messages.value.push({
-        side: 'left',
-        type: 'robot',
-        record: {
-            kind: '支出',
-            amount,
-            category,
-            time: formatRelativeTime(nowTs)
-        }
-    });
-};
+// 收入分类
+const incomeCategories = [
+	{ label: '工资', value: 'salary', icon: 'icon-gongzi' },
+	{ label: '奖金', value: 'bonus', icon: 'icon-jiangjin' },
+	{ label: '理财', value: 'investment', icon: 'icon-licai' },
+	{ label: '兼职', value: 'parttime', icon: 'icon-jianzhi' },
+	{ label: '红包', value: 'redpacket', icon: 'icon-hongbao' },
+	{ label: '其它', value: 'other', icon: 'icon-qita' }
+];
 
-const formatAmount = (n?: number) => (n ?? 0).toFixed(2);
-
-onMounted(async () => {
-    setListHeight();
+// 当前显示的分类
+const currentCategories = computed(() => {
+	return recordType.value === 'expense' ? expenseCategories : incomeCategories;
 });
 
-const setListHeight = async () => {
-    const inputHeight = await getDomHeight('.chat-input');
-    const sys = uni.getSystemInfoSync();
-    const windowHeight = sys.windowHeight;
-    const tabbarPx = uni.upx2px(100) + (sys.safeAreaInsets?.bottom || 0);
-    const pagePaddingPx = uni.upx2px(20 * 2);
-    chatListHeight.value = windowHeight - tabbarPx - inputHeight - pagePaddingPx;
+// 切换类型时清空分类选择
+watch(recordType, () => {
+	category.value = '';
+});
+
+// 格式化显示日期
+const formatDisplayDate = (timestamp: number) => {
+	const date = new Date(timestamp);
+	const today = new Date();
+	const yesterday = new Date(today);
+	yesterday.setDate(yesterday.getDate() - 1);
+	
+	const isToday = date.toDateString() === today.toDateString();
+	const isYesterday = date.toDateString() === yesterday.toDateString();
+	
+	const month = date.getMonth() + 1;
+	const day = date.getDate();
+	
+	if (isToday) {
+		return `今天 ${month}月${day}日`;
+	} else if (isYesterday) {
+		return `昨天 ${month}月${day}日`;
+	} else {
+		return `${date.getFullYear()}年${month}月${day}日`;
+	}
+};
+
+// 打开日期选择器
+const openDatePicker = () => {
+	tempDate.value = selectedDate.value;
+	datePickerVisible.value = true;
+};
+
+// 确认日期选择
+const confirmDate = () => {
+	selectedDate.value = tempDate.value;
+	datePickerVisible.value = false;
+};
+
+// 提交记账
+const handleSubmit = () => {
+	// 验证金额
+	if (!amount.value || parseFloat(amount.value) <= 0) {
+		toast.warning('请输入有效金额');
+		return;
+	}
+	
+	// 验证分类
+	if (!category.value) {
+		toast.warning('请选择分类');
+		return;
+	}
+	
+	const recordData = {
+		type: recordType.value,
+		amount: parseFloat(amount.value),
+		category: category.value,
+		categoryLabel: currentCategories.value.find(c => c.value === category.value)?.label || '',
+		remark: remark.value,
+		date: selectedDate.value,
+		createTime: Date.now()
+	};
+	
+	console.log('记账数据:', recordData);
+	
+	// TODO: 保存到本地存储或后端
+	
+	toast.success('记账成功！');
+	
+	// 重置表单
+	setTimeout(() => {
+		amount.value = '';
+		category.value = '';
+		remark.value = '';
+		selectedDate.value = Date.now();
+	}, 500);
 };
 
 onShow(() => {
-    console.log('记账页面');
+	console.log('记账页面');
 });
 </script>
 
 <style lang="scss">
 .content-record {
 	padding: 20rpx;
+	padding-bottom: 0;
+	background-color: #f5f7fa;
+	box-sizing: border-box;
+	overflow: hidden;
 
-	.chat-header {
-		padding: 20rpx 0 10rpx;
-		display: flex;
-		justify-content: flex-start;
-		.chat-title {
-			background-color: #3b82f6;
-			color: #fff;
-			padding: 12rpx 22rpx;
-			border-radius: 26rpx;
-			font-weight: 600;
-		}
-	}
+	// 金额输入区域
+	.amount-section {
+		background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+		border-radius: 20rpx;
+		padding: 32rpx 24rpx 40rpx;
+		margin-bottom: 20rpx;
 
-	.chat-list {
-		overflow-y: auto;
-		padding: 10rpx 6rpx 90rpx;
-	}
-
-	.chat-item {
-		display: flex;
-		margin: 26rpx 16rpx;
-		align-items: flex-start;
-		.avatar {
-			width: 48rpx;
-			height: 48rpx;
-			border-radius: 50%;
-			background-color: #d1d5db;
-			margin-right: 16rpx;
-		}
-		.msg-wrap {
+		.type-tabs {
 			display: flex;
-			flex-direction: column;
-			max-width: 70%;
-		}
-		.msg-wrap.right {
-			margin-left: auto;
-			align-items: flex-end;
-		}
-		.msg-wrap.left {
-			align-items: flex-start;
-		}
-		.bubble {
-			max-width: 100%;
-			.record-card {
-				background: #f5f7fb;
-				border-radius: 20rpx;
-				padding: 22rpx;
-				color: #26303d;
-				.card-title {
+			background-color: rgba(255, 255, 255, 0.2);
+			border-radius: 12rpx;
+			padding: 4rpx;
+			margin-bottom: 30rpx;
+
+			.type-tab {
+				flex: 1;
+				text-align: center;
+				padding: 16rpx 0;
+				border-radius: 10rpx;
+				color: rgba(255, 255, 255, 0.7);
+				font-size: 28rpx;
+				transition: all 0.3s;
+
+				&.active {
+					background-color: #fff;
+					color: #3b82f6;
 					font-weight: 600;
-					margin-bottom: 12rpx;
 				}
-				.card-row text {
-					display: block;
-					line-height: 1.6;
-					font-size: 26rpx;
-				}
+			}
+		}
+
+		.amount-display {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 20rpx 0;
+			min-height: 80rpx;
+
+			.currency {
+				color: #fff;
+				font-size: 40rpx;
+				font-weight: 600;
+				margin-right: 8rpx;
+				line-height: 1;
+			}
+
+			.amount-input {
+				color: #fff;
+				font-size: 56rpx;
+				font-weight: 700;
+				text-align: center;
+				width: 360rpx;
+				height: 80rpx;
+				line-height: 80rpx;
+				background: transparent;
+			}
+
+			.amount-placeholder {
+				color: rgba(255, 255, 255, 0.5);
 			}
 		}
 	}
 
-	.chat-item.right {
-		justify-content: flex-end;
-		.bubble.user {
-			background-color: #3b82f6;
-			color: #fff;
-			padding: 16rpx 22rpx;
-			border-radius: 20rpx 20rpx 6rpx 20rpx;
-			max-width: 100%;
+	// 表单区域通用样式
+	.form-section {
+		background-color: #fff;
+		border-radius: 16rpx;
+		padding: 20rpx;
+		margin-bottom: 20rpx;
+
+		.section-title {
+			font-size: 26rpx;
+			font-weight: 600;
+			color: #333;
+			margin-bottom: 16rpx;
 		}
 	}
 
-.bubble-time {
-	margin-top: 10rpx;
-	font-size: 24rpx;
-	color: #9ca3af;
-	display: block;
-}
-.chat-item.right .bubble-time { text-align: right; }
+	// 分类选择 - 响应式布局
+	.category-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 16rpx;
 
-	.chat-input {
-		position: fixed;
-		left: 0;
-		right: 0;
-		bottom: calc(100rpx + env(safe-area-inset-bottom));
-		z-index: 10;
+		.category-item {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			padding: 16rpx 0;
+			border-radius: 12rpx;
+			transition: all 0.2s;
+
+			&.active {
+				background-color: #e8f2ff;
+
+				.category-icon {
+					background-color: #3b82f6;
+					
+					.iconfont {
+						color: #fff;
+					}
+				}
+
+				.category-name {
+					color: #3b82f6;
+					font-weight: 600;
+				}
+			}
+
+			.category-icon {
+				width: 80rpx;
+				height: 80rpx;
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				margin-bottom: 12rpx;
+				background-color: #f0f2f5;
+				transition: all 0.2s;
+
+				.iconfont {
+					font-size: 38rpx;
+					color: #666;
+				}
+			}
+
+			.category-name {
+				font-size: 24rpx;
+				color: #666;
+				text-align: center;
+			}
+		}
+	}
+
+	// 日期选择
+	.date-cell {
+		background-color: #f5f7fa;
+		border-radius: 12rpx;
+		padding: 0 16rpx;
+	}
+
+	.date-icon {
+		font-size: 32rpx;
+		color: #3b82f6;
+		margin-right: 12rpx;
+	}
+
+	// 备注输入
+	.remark-input-wrap {
+		background-color: #f5f7fa;
+		border-radius: 12rpx;
+		padding: 16rpx;
+
+		.remark-input {
+			width: 100%;
+			min-height: 100rpx;
+			font-size: 26rpx;
+			color: #333;
+			line-height: 1.6;
+		}
+
+		.remark-placeholder {
+			color: #999;
+		}
+	}
+
+	// 底部占位
+	.bottom-placeholder {
+		height: calc(120rpx + env(safe-area-inset-bottom));
+	}
+
+	// 日期选择器弹窗
+	.picker-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 20rpx 10rpx;
+		border-bottom: 1rpx solid #eee;
+
+		.picker-cancel {
+			font-size: 28rpx;
+			color: #999;
+			padding: 10rpx 20rpx;
+		}
+
+		.picker-title {
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #333;
+		}
+
+		.picker-confirm {
+			font-size: 28rpx;
+			color: #3b82f6;
+			font-weight: 600;
+			padding: 10rpx 20rpx;
+		}
+	}
+}
+
+// 提交按钮 - 固定底部
+.submit-section {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: calc(100rpx + env(safe-area-inset-bottom));
+	z-index: 100;
+	padding: 16rpx 20rpx;
+	background: linear-gradient(to top, #f5f7fa 80%, transparent);
+
+	.submit-btn {
+		width: 100%;
+		height: 88rpx;
+		border-radius: 44rpx;
 		display: flex;
 		align-items: center;
-		padding: 12rpx 20rpx;
-		background: rgba(255, 255, 255, 0.92);
-		backdrop-filter: blur(6px);
-		.input {
-			flex: 1;
-			height: 72rpx;
-			border: 2rpx solid #eee;
-			border-radius: 999rpx;
-			padding: 0 30rpx;
-			font-size: 28rpx;
-			background-color: #fff;
-		}
-		.send-btn {
-			margin-left: 16rpx;
-			width: 72rpx;
-			height: 72rpx;
-			border-radius: 50%;
-			background-color: #3b82f6;
+		justify-content: center;
+		border: none;
+		box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+
+		text {
 			color: #fff;
-			display: flex;
-			align-items: center;
-			justify-content: center;
+			font-size: 30rpx;
+			font-weight: 600;
 		}
-		.send-icon {
-			font-size: 32rpx;
+
+		&.expense {
+			background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+		}
+
+		&.income {
+			background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+		}
+
+		&::after {
+			border: none;
 		}
 	}
 }
